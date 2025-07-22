@@ -25,10 +25,10 @@ const sequelize = new Sequelize(
 export const connectToDatabase = async () => {
     try {
         await sequelize.authenticate();
-        console.log('✅ Connected to database: inventory-live-tracker-db');
+        console.log(`✅ Database connection established successfully.`);
 
         if (env === 'development') {
-            await sequelize.sync({ alter: true });
+            await sequelize.sync({ force: false }); // Use force: false in development to avoid dropping tables
             console.log('✅ Database synchronized successfully.');
         }
 
