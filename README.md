@@ -26,42 +26,6 @@ A scalable real-time inventory backend system using **Express.js**, **Socket.IO*
 | DevOps       | Docker + GitHub Actions (CI/CD) |
 | Auth         | JWT / Passport (optional) |
 
----
-
-## 🏗️ Folder Structure
-
-📁 inventory-system/
-
-├── 📁 src/
-
-│ ├── 📁 controllers/
-
-│ ├── 📁 routes/
-
-│ ├── 📁 models/
-
-│ ├── 📁 services/
-
-│ ├── 📁 sockets/
-
-│ ├── 📄 app.js
-
-├── 📁 config/
-
-│ ├── 📄 database.js
-
-│ ├── 📄 redis.js
-
-├── 📄 docker-compose.yml
-
-├── 📄 Dockerfile
-
-├── 📄 .env
-
-├── 📄 README.md
-
-
----
 
 ## 📦 Getting Started
 
