@@ -31,8 +31,11 @@ A scalable real-time inventory backend system using **Express.js**, **Socket.IO*
 ## 🏗️ Folder Structure
 
 📁 inventory-system/
+
 ├── 📁 src/
+
 │ ├── 📁 controllers/
+
 │ ├── 📁 routes/
 │ ├── 📁 models/
 │ ├── 📁 services/
