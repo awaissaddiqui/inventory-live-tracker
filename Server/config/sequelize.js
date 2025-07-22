@@ -1,5 +1,5 @@
 import { Sequelize } from 'sequelize';
-import config from './database.js';
+import config from './database.cjs';
 
 const env = process.env.NODE_ENV || 'development';
 const dbConfig = config[env];
@@ -27,10 +27,14 @@ export const connectToDatabase = async () => {
         await sequelize.authenticate();
         console.log(`✅ Database connection established successfully.`);
 
-        if (env === 'development') {
-            await sequelize.sync({ force: false }); // Use force: false in development to avoid dropping tables
-            console.log('✅ Database synchronized successfully.');
-        }
+        // Import models to register them
+        await import('../models/index.js');
+
+        // Don't use sync in production - use migrations instead
+        // if (env === 'development') {
+        //     await sequelize.sync({ force: false });
+        //     console.log('✅ Database synchronized successfully.');
+        // }
 
         return sequelize;
     } catch (error) {
