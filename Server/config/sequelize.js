@@ -28,7 +28,7 @@ export const connectToDatabase = async () => {
         console.log(`✅ Database connection established successfully.`);
 
         // Import models to register them
-        await import('../models/index.js');
+        await import('../routes/index.js');
 
         // Don't use sync in production - use migrations instead
         // if (env === 'development') {
