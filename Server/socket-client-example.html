@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Real-Time Updates</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .event-log {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .event {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            background-color: white;
+        }
+
+        .event.inventory {
+            border-left-color: #28a745;
+        }
+
+        .event.transaction {
+            border-left-color: #ffc107;
+        }
+
+        .event.product {
+            border-left-color: #17a2b8;
+        }
+
+        .event.alert {
+            border-left-color: #dc3545;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button.active {
+            background-color: #28a745;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🚀 Inventory Live Tracker - Real-Time Updates</h1>
+
+    <div class="container">
+        <h3>Connection Status</h3>
+        <div id="status" class="status disconnected">
+            ❌ Disconnected from server
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>Room Controls</h3>
+        <div class="controls">
+            <button id="joinInventory">📦 Join Inventory Room</button>
+            <button id="joinDashboard">📊 Join Dashboard Room</button>
+            <button id="joinTransactions">💰 Join Transactions Room</button>
+            <button id="clearLog">🗑️ Clear Log</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>Real-Time Event Log</h3>
+        <div id="eventLog" class="event-log">
+            <div class="event">📋 Waiting for events...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>📝 How to Use Socket Events</h3>
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px;">
+            <h4>🔌 Available Socket Events:</h4>
+            <ul>
+                <li><strong>inventory:updated</strong> - Fired when stock levels change</li>
+                <li><strong>inventory:low-stock</strong> - Fired when stock goes below minimum</li>
+                <li><strong>inventory:out-of-stock</strong> - Fired when stock reaches zero</li>
+                <li><strong>inventory:location-updated</strong> - Fired when item location changes</li>
+                <li><strong>transaction:created</strong> - Fired when new transaction is recorded</li>
+                <li><strong>product:created</strong> - Fired when new product is added</li>
+                <li><strong>product:updated</strong> - Fired when product details change</li>
+                <li><strong>product:deleted</strong> - Fired when product is removed</li>
+                <li><strong>dashboard:updated</strong> - Fired when dashboard stats need refresh</li>
+            </ul>
+
+            <h4>🏠 Room Management:</h4>
+            <ul>
+                <li><strong>inventory</strong> - Receive all inventory-related events</li>
+                <li><strong>dashboard</strong> - Receive dashboard statistics updates</li>
+                <li><strong>transactions</strong> - Receive transaction-related events</li>
+                <li><strong>product:ID</strong> - Receive events for specific product</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Socket.io connection
+        const socket = io('http://localhost:8000');
+
+        const statusEl = document.getElementById('status');
+        const eventLogEl = document.getElementById('eventLog');
+        const joinInventoryBtn = document.getElementById('joinInventory');
+        const joinDashboardBtn = document.getElementById('joinDashboard');
+        const joinTransactionsBtn = document.getElementById('joinTransactions');
+        const clearLogBtn = document.getElementById('clearLog');
+
+        let eventCount = 0;
+
+        // Connection status handlers
+        socket.on('connect', () => {
+            statusEl.className = 'status connected';
+            statusEl.innerHTML = '✅ Connected to server';
+            addEventToLog('system', 'Connected to server', { socketId: socket.id });
+        });
+
+        socket.on('disconnect', () => {
+            statusEl.className = 'status disconnected';
+            statusEl.innerHTML = '❌ Disconnected from server';
+            addEventToLog('system', 'Disconnected from server');
+        });
+
+        socket.on('connect_error', (error) => {
+            statusEl.className = 'status disconnected';
+            statusEl.innerHTML = '❌ Connection error';
+            addEventToLog('error', 'Connection error', { error: error.message });
+        });
+
+        // Inventory events
+        socket.on('inventory:updated', (data) => {
+            addEventToLog('inventory', 'Stock Updated', data);
+        });
+
+        socket.on('inventory:low-stock', (data) => {
+            addEventToLog('alert', 'Low Stock Alert', data);
+        });
+
+        socket.on('inventory:out-of-stock', (data) => {
+            addEventToLog('alert', 'Out of Stock Alert', data);
+        });
+
+        socket.on('inventory:location-updated', (data) => {
+            addEventToLog('inventory', 'Location Updated', data);
+        });
+
+        // Transaction events
+        socket.on('transaction:created', (data) => {
+            addEventToLog('transaction', 'New Transaction', data);
+        });
+
+        // Product events
+        socket.on('product:created', (data) => {
+            addEventToLog('product', 'Product Created', data);
+        });
+
+        socket.on('product:updated', (data) => {
+            addEventToLog('product', 'Product Updated', data);
+        });
+
+        socket.on('product:deleted', (data) => {
+            addEventToLog('product', 'Product Deleted', data);
+        });
+
+        // Dashboard events
+        socket.on('dashboard:updated', (data) => {
+            addEventToLog('system', 'Dashboard Refresh', data || {});
+        });
+
+        // Room join buttons
+        joinInventoryBtn.addEventListener('click', () => {
+            socket.emit('join:inventory');
+            joinInventoryBtn.classList.add('active');
+            addEventToLog('system', 'Joined inventory room');
+        });
+
+        joinDashboardBtn.addEventListener('click', () => {
+            socket.emit('join:dashboard');
+            joinDashboardBtn.classList.add('active');
+            addEventToLog('system', 'Joined dashboard room');
+        });
+
+        joinTransactionsBtn.addEventListener('click', () => {
+            socket.emit('join:transactions');
+            joinTransactionsBtn.classList.add('active');
+            addEventToLog('system', 'Joined transactions room');
+        });
+
+        clearLogBtn.addEventListener('click', () => {
+            eventLogEl.innerHTML = '<div class="event">📋 Log cleared...</div>';
+            eventCount = 0;
+        });
+
+        // Helper function to add events to log
+        function addEventToLog(type, message, data = {}) {
+            eventCount++;
+            const timestamp = new Date().toLocaleTimeString();
+            const eventEl = document.createElement('div');
+            eventEl.className = `event ${type}`;
+
+            const typeIcon = {
+                'inventory': '📦',
+                'transaction': '💰',
+                'product': '🏷️',
+                'alert': '🚨',
+                'system': '⚙️',
+                'error': '❌'
+            };
+
+            eventEl.innerHTML = `
+                <strong>[${timestamp}] ${typeIcon[type] || '📋'} ${message}</strong>
+                ${Object.keys(data).length > 0 ? `<br><small>${JSON.stringify(data, null, 2)}</small>` : ''}
+            `;
+
+            // Insert at the beginning
+            if (eventLogEl.firstChild) {
+                eventLogEl.insertBefore(eventEl, eventLogEl.firstChild);
+            } else {
+                eventLogEl.appendChild(eventEl);
+            }
+
+            // Keep only last 50 events
+            while (eventLogEl.children.length > 50) {
+                eventLogEl.removeChild(eventLogEl.lastChild);
+            }
+        }
+
+        // Auto-join inventory room on connection
+        socket.on('connect', () => {
+            setTimeout(() => {
+                socket.emit('join:inventory');
+                socket.emit('join:dashboard');
+                joinInventoryBtn.classList.add('active');
+                joinDashboardBtn.classList.add('active');
+            }, 1000);
+        });
+    </script>
+</body>
+
+</html>

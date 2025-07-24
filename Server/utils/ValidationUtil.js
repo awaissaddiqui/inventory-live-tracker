@@ -103,6 +103,64 @@ class ValidationUtil {
     }
 
     /**
+     * Check if email is valid format
+     * @param {string} email - Email to check
+     * @returns {boolean} True if valid
+     */
+    static isValidEmail(email) {
+        return email && VALIDATION_PATTERNS.EMAIL.test(email.trim());
+    }
+
+    /**
+     * Validate password strength
+     * @param {string} password - Password to validate
+     * @returns {Object} Validation result
+     */
+    static validatePassword(password) {
+        const errors = [];
+
+        if (!password) {
+            errors.push('Password is required');
+            return { isValid: false, errors };
+        }
+
+        if (password.length < 8) {
+            errors.push('Password must be at least 8 characters long');
+        }
+
+        if (!/[A-Z]/.test(password)) {
+            errors.push('Password must contain at least one uppercase letter');
+        }
+
+        if (!/[a-z]/.test(password)) {
+            errors.push('Password must contain at least one lowercase letter');
+        }
+
+        if (!/\d/.test(password)) {
+            errors.push('Password must contain at least one number');
+        }
+
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+            errors.push('Password must contain at least one special character');
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors
+        };
+    }
+
+    /**
+     * Check if password is valid
+     * @param {string} password - Password to check
+     * @returns {boolean} True if valid
+     */
+    static isValidPassword(password) {
+        const result = this.validatePassword(password);
+        return result.isValid;
+    }
+
+    /**
      * Validate numeric values
      * @param {*} value - Value to validate
      * @param {string} fieldName - Field name for error messages

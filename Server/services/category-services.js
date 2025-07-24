@@ -1,4 +1,3 @@
-import { Category, Product } from '../routes/index.js';
 import { Op } from 'sequelize';
 import { PAGINATION, DATABASE_CONSTRAINTS } from '../constant/index.js';
 import {

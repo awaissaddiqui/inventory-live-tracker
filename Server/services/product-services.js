@@ -1,4 +1,4 @@
-import { Product, Category, Inventory, Transaction } from '../routes/index.js';
+import { Product, Category, Inventory, Transaction } from '../models/index.js';
 import { Op } from 'sequelize';
 import { PRODUCT_UNITS, DATABASE_CONSTRAINTS, PAGINATION } from '../constant/index.js';
 import {
@@ -9,6 +9,7 @@ import {
     ValidationError,
     ConflictError
 } from '../utils/index.js';
+import SocketService from './socket-services.js';
 
 class ProductService {
 
@@ -198,7 +199,33 @@ class ProductService {
             }
 
             // Return product with relations
-            return await this.getProductById(product.id);
+            const createdProduct = await this.getProductById(product.id);
+
+            // Emit socket events for new product
+            SocketService.emitProductCreated(product.id, {
+                sku: createdProduct.sku,
+                name: createdProduct.name,
+                category: createdProduct.category,
+                initial_stock: parseInt(initial_stock),
+                location: location?.trim()
+            });
+
+            // If initial stock added, emit inventory update
+            if (initial_stock > 0) {
+                SocketService.emitInventoryUpdate(product.id, {
+                    current_stock: parseInt(initial_stock),
+                    previous_stock: 0,
+                    transaction_type: 'IN',
+                    quantity: parseInt(initial_stock),
+                    location: location?.trim(),
+                    product: createdProduct
+                });
+            }
+
+            // Emit dashboard update
+            SocketService.emitDashboardUpdate();
+
+            return createdProduct;
         } catch (error) {
             throw new Error(`Failed to create product: ${error.message}`);
         }
@@ -267,7 +294,23 @@ class ProductService {
                 is_active: updateData.is_active !== undefined ? updateData.is_active : product.is_active
             });
 
-            return await this.getProductById(id);
+            const updatedProduct = await this.getProductById(id);
+
+            // Emit socket event for product update
+            SocketService.emitProductUpdated(id, {
+                sku: updatedProduct.sku,
+                name: updatedProduct.name,
+                category: updatedProduct.category,
+                price: updatedProduct.price,
+                minimum_stock: updatedProduct.minimum_stock,
+                maximum_stock: updatedProduct.maximum_stock,
+                is_active: updatedProduct.is_active
+            });
+
+            // Emit dashboard update
+            SocketService.emitDashboardUpdate();
+
+            return updatedProduct;
         } catch (error) {
             throw new Error(`Failed to update product: ${error.message}`);
         }
@@ -294,6 +337,16 @@ class ProductService {
 
             // Soft delete
             await product.update({ is_active: false });
+
+            // Emit socket event for product deletion
+            SocketService.emitProductDeleted(id, {
+                sku: product.sku,
+                name: product.name,
+                category: product.category
+            });
+
+            // Emit dashboard update
+            SocketService.emitDashboardUpdate();
 
             return { message: 'Product deleted successfully' };
         } catch (error) {

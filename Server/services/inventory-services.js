@@ -1,4 +1,4 @@
-import { Inventory, Product, Category, Transaction } from '../routes/index.js';
+import { Inventory, Product, Category, Transaction } from '../models/index.js';
 import { Op, Sequelize } from 'sequelize';
 import sequelize from '../config/sequelize.js';
 import { TRANSACTION_TYPES, PAGINATION } from '../constant/index.js';
@@ -9,6 +9,7 @@ import {
     ValidationError,
     BusinessLogicError
 } from '../utils/index.js';
+import SocketService from './socket-services.js';
 
 class InventoryService {
 
@@ -223,8 +224,40 @@ class InventoryService {
 
             await dbTransaction.commit();
 
+            // Get updated inventory data
+            const updatedInventory = await this.getInventoryByProductId(productId);
+
+            // Emit socket events for real-time updates
+            SocketService.emitInventoryUpdate(productId, {
+                current_stock: newStock,
+                previous_stock: inventory.current_stock,
+                transaction_type,
+                quantity: Math.abs(transactionQuantity),
+                location: updatedInventory.location,
+                product: updatedInventory.product
+            });
+
+            // Check for low stock alert
+            if (newStock <= updatedInventory.product.minimum_stock && newStock > 0) {
+                SocketService.emitLowStockAlert(productId, {
+                    current_stock: newStock,
+                    minimum_stock: updatedInventory.product.minimum_stock,
+                    product: updatedInventory.product
+                });
+            }
+
+            // Check for out of stock alert
+            if (newStock === 0) {
+                SocketService.emitOutOfStockAlert(productId, {
+                    product: updatedInventory.product
+                });
+            }
+
+            // Emit dashboard update for overall statistics
+            SocketService.emitDashboardUpdate();
+
             // Return updated inventory
-            return await this.getInventoryByProductId(productId);
+            return updatedInventory;
         } catch (error) {
             await dbTransaction.rollback();
             if (error instanceof ValidationError || error instanceof NotFoundError || error instanceof BusinessLogicError) {
@@ -352,12 +385,30 @@ class InventoryService {
                 throw new Error('Inventory record not found');
             }
 
+            const previousLocation = inventory.location;
+
             await inventory.update({
                 location: location.trim(),
                 last_updated: new Date()
             });
 
-            return await this.getInventoryByProductId(productId);
+            const updatedInventory = await this.getInventoryByProductId(productId);
+
+            // Emit socket event for location update
+            SocketService.emitInventoryLocationUpdate(productId, {
+                previous_location: previousLocation,
+                new_location: location.trim(),
+                product: updatedInventory.product
+            });
+
+            // Emit general inventory update
+            SocketService.emitInventoryUpdate(productId, {
+                current_stock: updatedInventory.current_stock,
+                location: updatedInventory.location,
+                product: updatedInventory.product
+            });
+
+            return updatedInventory;
         } catch (error) {
             throw new Error(`Failed to update location: ${error.message}`);
         }

@@ -1,7 +1,8 @@
-import Category from "./category.model";
-import Product from "./product.model";
-import Inventory from "./inventory.model";
-import Transaction from "./transaction.model";
+import Category from "./category.model.js";
+import Product from "./product.model.js";
+import Inventory from "./inventory.model.js";
+import Transaction from "./transaction.model.js";
+import User from "./user.model.js";
 
 // Category - Product (One to Many)
 Category.hasMany(Product, {
@@ -53,7 +54,8 @@ export {
     Category,
     Product,
     Inventory,
-    Transaction
+    Transaction,
+    User
 };
 
 // Export default for easier importing
@@ -61,5 +63,6 @@ export default {
     Category,
     Product,
     Inventory,
-    Transaction
+    Transaction,
+    User
 };

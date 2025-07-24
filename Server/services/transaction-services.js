@@ -1,7 +1,8 @@
-import { Transaction, Product, Category } from '../routes/index.js';
+import { Transaction, Product, Category } from '../models/index.js';
 import { Op } from 'sequelize';
 import { TRANSACTION_TYPES, PAGINATION } from '../constant/index.js';
 import { DatabaseUtil, ValidationUtil, NotFoundError, ValidationError } from '../utils/index.js';
+import SocketService from './socket-services.js';
 
 class TransactionService {
 
@@ -239,7 +240,21 @@ class TransactionService {
                 transaction_date: new Date()
             });
 
-            return await this.getTransactionById(transaction.id);
+            const createdTransaction = await this.getTransactionById(transaction.id);
+
+            // Emit socket event for new transaction
+            SocketService.emitTransactionCreated(transaction.id, {
+                transaction_type,
+                quantity: createdTransaction.quantity,
+                reference_number: createdTransaction.reference_number,
+                product: createdTransaction.product,
+                transaction_date: createdTransaction.transaction_date
+            });
+
+            // Emit dashboard update for transaction statistics
+            SocketService.emitDashboardUpdate();
+
+            return createdTransaction;
         } catch (error) {
             if (error instanceof ValidationError || error instanceof NotFoundError) {
                 throw error;

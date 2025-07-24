@@ -16,6 +16,12 @@ export const PRODUCT_UNITS = {
     PACK: 'pack'
 };
 
+// User Roles
+export const USER_ROLES = ['admin', 'manager', 'user'];
+
+// User Status
+export const USER_STATUS = ['active', 'inactive', 'suspended'];
+
 // HTTP Status Codes
 export const HTTP_STATUS = {
     OK: 200,
@@ -161,6 +167,8 @@ export const RATE_LIMITS = {
 export default {
     TRANSACTION_TYPES,
     PRODUCT_UNITS,
+    USER_ROLES,
+    USER_STATUS,
     HTTP_STATUS,
     MESSAGES,
     PAGINATION,
