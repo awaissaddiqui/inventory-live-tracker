@@ -1,349 +1,161 @@
-import ProductService from '../services/product-services.js';
-import {
-    ResponseUtil,
-    ErrorUtil,
-    ValidationError,
-    NotFoundError,
-    ConflictError
-} from '../utils/index.js';
-import { MESSAGES } from '../constant/index.js';
+import { Product, Category } from '../models/index.js';
 
 class ProductController {
-
-    /**
-     * Get all products with filters
-     * @route GET /api/products
-     */
+    // Get all products
     static async getAllProducts(req, res) {
         try {
-            const result = await ProductService.getAllProducts(req.query);
-
-            return ResponseUtil.paginated(
-                res,
-                result.products,
-                result.pagination,
-                'Products retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'getAllProducts',
-                query: req.query
+            const products = await Product.findAll({
+                include: [{
+                    model: Category,
+                    as: 'category'
+                }],
+                order: [['name', 'ASC']]
             });
 
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            res.status(200).json({
+                success: true,
+                message: 'Products retrieved successfully',
+                data: products
+            });
+        } catch (error) {
+            console.error('Get all products error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve products'
+            });
         }
     }
 
-    /**
-     * Get product by ID
-     * @route GET /api/products/:id
-     */
+    // Get product by ID
     static async getProductById(req, res) {
         try {
             const { id } = req.params;
-            const product = await ProductService.getProductById(id);
-
-            return ResponseUtil.success(
-                res,
-                product,
-                'Product retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'getProductById',
-                params: req.params
+            const product = await Product.findByPk(id, {
+                include: [{
+                    model: Category,
+                    as: 'category'
+                }]
             });
 
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
+            if (!product) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Product not found'
+                });
             }
 
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            res.status(200).json({
+                success: true,
+                message: 'Product retrieved successfully',
+                data: product
+            });
+        } catch (error) {
+            console.error('Get product by ID error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve product'
+            });
         }
     }
 
-    /**
-     * Get product by SKU
-     * @route GET /api/products/sku/:sku
-     */
-    static async getProductBySKU(req, res) {
-        try {
-            const { sku } = req.params;
-            const product = await ProductService.getProductBySKU(sku);
-
-            return ResponseUtil.success(
-                res,
-                product,
-                'Product retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'getProductBySKU',
-                params: req.params
-            });
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get product by barcode
-     * @route GET /api/products/barcode/:barcode
-     */
-    static async getProductByBarcode(req, res) {
-        try {
-            const { barcode } = req.params;
-            const product = await ProductService.getProductByBarcode(barcode);
-
-            return ResponseUtil.success(
-                res,
-                product,
-                'Product retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'getProductByBarcode',
-                params: req.params
-            });
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Create new product
-     * @route POST /api/products
-     */
+    // Create new product
     static async createProduct(req, res) {
         try {
-            const product = await ProductService.createProduct(req.body);
+            const { name, description, price, sku, category_id } = req.body;
 
-            return ResponseUtil.created(
-                res,
-                product,
-                'Product created successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'createProduct',
-                body: req.body
+            if (!name || !price || !sku) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Name, price, and SKU are required'
+                });
+            }
+
+            const product = await Product.create({
+                name,
+                description: description || '',
+                price,
+                sku,
+                category_id,
+                is_active: true
             });
 
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof ConflictError) {
-                return ResponseUtil.conflict(res, error.message);
-            }
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            res.status(201).json({
+                success: true,
+                message: 'Product created successfully',
+                data: product
+            });
+        } catch (error) {
+            console.error('Create product error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to create product'
+            });
         }
     }
 
-    /**
-     * Update product
-     * @route PUT /api/products/:id
-     */
+    // Update product
     static async updateProduct(req, res) {
         try {
             const { id } = req.params;
-            const product = await ProductService.updateProduct(id, req.body);
+            const updateData = req.body;
 
-            return ResponseUtil.updated(
-                res,
-                product,
-                'Product updated successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'updateProduct',
-                params: req.params,
-                body: req.body
+            const [updatedRowsCount] = await Product.update(updateData, {
+                where: { id }
             });
 
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
+            if (updatedRowsCount === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Product not found'
+                });
             }
 
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
+            const updatedProduct = await Product.findByPk(id, {
+                include: [{
+                    model: Category,
+                    as: 'category'
+                }]
+            });
 
-            if (error instanceof ConflictError) {
-                return ResponseUtil.conflict(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            res.status(200).json({
+                success: true,
+                message: 'Product updated successfully',
+                data: updatedProduct
+            });
+        } catch (error) {
+            console.error('Update product error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to update product'
+            });
         }
     }
 
-    /**
-     * Delete product (soft delete)
-     * @route DELETE /api/products/:id
-     */
+    // Delete product
     static async deleteProduct(req, res) {
         try {
             const { id } = req.params;
-            const result = await ProductService.deleteProduct(id);
-
-            return ResponseUtil.deleted(res, result.message);
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'deleteProduct',
-                params: req.params
+            const deletedRowsCount = await Product.destroy({
+                where: { id }
             });
 
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
+            if (deletedRowsCount === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Product not found'
+                });
             }
 
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get low stock products
-     * @route GET /api/products/low-stock
-     */
-    static async getLowStockProducts(req, res) {
-        try {
-            const filters = { ...req.query, low_stock: true };
-            const result = await ProductService.getAllProducts(filters);
-
-            return ResponseUtil.paginated(
-                res,
-                result.products,
-                result.pagination,
-                'Low stock products retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'getLowStockProducts',
-                query: req.query
+            res.status(200).json({
+                success: true,
+                message: 'Product deleted successfully'
             });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Bulk import products
-     * @route POST /api/products/bulk-import
-     */
-    static async bulkImportProducts(req, res) {
-        try {
-            const { products } = req.body;
-
-            if (!products || !Array.isArray(products) || products.length === 0) {
-                return ResponseUtil.badRequest(res, 'Products array is required and cannot be empty');
-            }
-
-            const results = [];
-            const errors = [];
-
-            for (let i = 0; i < products.length; i++) {
-                try {
-                    const product = await ProductService.createProduct(products[i]);
-                    results.push({
-                        index: i,
-                        success: true,
-                        product: product,
-                        sku: products[i].sku
-                    });
-                } catch (error) {
-                    errors.push({
-                        index: i,
-                        success: false,
-                        error: error.message,
-                        sku: products[i].sku || 'N/A'
-                    });
-                }
-            }
-
-            return ResponseUtil.success(
-                res,
-                {
-                    total: products.length,
-                    successful: results.length,
-                    failed: errors.length,
-                    results,
-                    errors
-                },
-                `Bulk import completed. ${results.length} successful, ${errors.length} failed.`
-            );
         } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'ProductController',
-                method: 'bulkImportProducts',
-                body: req.body
+            console.error('Delete product error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to delete product'
             });
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
         }
     }
 }

@@ -1,178 +1,53 @@
-import DashboardService from '../services/dasboard-services.js';
-import { ResponseUtil, ErrorUtil } from '../utils/index.js';
-import { MESSAGES } from '../constant/index.js';
-
 class DashboardController {
-
-    /**
-     * Get complete dashboard data
-     * @route GET /api/dashboard
-     */
-    static async getDashboard(req, res) {
+    // Get basic dashboard statistics
+    static async getDashboardStats(req, res) {
         try {
-            const dashboardData = await DashboardService.getDashboardData();
+            // Simple dashboard data
+            const stats = {
+                totalProducts: 0,
+                totalCategories: 0,
+                lowStockItems: 0,
+                totalTransactions: 0,
+                totalUsers: 0
+            };
 
-            return ResponseUtil.success(
-                res,
-                dashboardData,
-                'Dashboard data retrieved successfully'
-            );
+            res.status(200).json({
+                success: true,
+                message: 'Dashboard stats retrieved successfully',
+                data: stats
+            });
         } catch (error) {
-            ErrorUtil.logError(error, { controller: 'DashboardController', method: 'getDashboard' });
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            console.error('Get dashboard stats error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve dashboard stats'
+            });
         }
     }
 
-    /**
-     * Get inventory statistics only
-     * @route GET /api/dashboard/stats  
-     */
-    static async getInventoryStats(req, res) {
+    // Get recent activity
+    static async getRecentActivity(req, res) {
         try {
-            const stats = await DashboardService.getInventoryStats();
+            const recentActivity = [
+                {
+                    id: 1,
+                    action: 'Product Added',
+                    description: 'New product added to inventory',
+                    timestamp: new Date().toISOString()
+                }
+            ];
 
-            return ResponseUtil.success(
-                res,
-                stats,
-                'Inventory statistics retrieved successfully'
-            );
+            res.status(200).json({
+                success: true,
+                message: 'Recent activity retrieved successfully',
+                data: recentActivity
+            });
         } catch (error) {
-            ErrorUtil.logError(error, { controller: 'DashboardController', method: 'getInventoryStats' });
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get low stock alerts
-     * @route GET /api/dashboard/alerts
-     */
-    static async getLowStockAlerts(req, res) {
-        try {
-            const alerts = await DashboardService.getLowStockAlerts();
-
-            return ResponseUtil.success(
-                res,
-                alerts,
-                'Low stock alerts retrieved successfully',
-                200,
-                { count: alerts.length }
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, { controller: 'DashboardController', method: 'getLowStockAlerts' });
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get recent transactions
-     * @route GET /api/dashboard/transactions
-     */
-    static async getRecentTransactions(req, res) {
-        try {
-            const limit = parseInt(req.query.limit) || 10;
-            const transactions = await DashboardService.getRecentTransactions(limit);
-
-            return ResponseUtil.success(
-                res,
-                transactions,
-                'Recent transactions retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, { controller: 'DashboardController', method: 'getRecentTransactions' });
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get stock movement trends
-     * @route GET /api/dashboard/trends
-     */
-    static async getStockMovementTrends(req, res) {
-        try {
-            const trends = await DashboardService.getStockMovementTrends();
-
-            return ResponseUtil.success(
-                res,
-                trends,
-                'Stock movement trends retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, { controller: 'DashboardController', method: 'getStockMovementTrends' });
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get category-wise stock distribution
-     * @route GET /api/dashboard/categories
-     */
-    static async getCategoryWiseStock(req, res) {
-        try {
-            const categoryStats = await DashboardService.getCategoryWiseStock();
-
-            return ResponseUtil.success(
-                res,
-                categoryStats,
-                'Category-wise stock data retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, { controller: 'DashboardController', method: 'getCategoryWiseStock' });
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get top selling products
-     * @route GET /api/dashboard/top-products
-     */
-    static async getTopSellingProducts(req, res) {
-        try {
-            const limit = parseInt(req.query.limit) || 5;
-            const topProducts = await DashboardService.getTopSellingProducts(limit);
-
-            return ResponseUtil.success(
-                res,
-                topProducts,
-                'Top selling products retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, { controller: 'DashboardController', method: 'getTopSellingProducts' });
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            console.error('Get recent activity error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve recent activity'
+            });
         }
     }
 }

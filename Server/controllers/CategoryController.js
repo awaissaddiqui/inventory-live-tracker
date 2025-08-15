@@ -1,222 +1,144 @@
-import CategoryService from '../services/category-services.js';
-import {
-    ResponseUtil,
-    ErrorUtil,
-    ValidationError,
-    NotFoundError,
-    ConflictError
-} from '../utils/index.js';
-import { MESSAGES } from '../constant/index.js';
+import { Category } from '../models/index.js';
 
 class CategoryController {
-
-    /**
-     * Get all categories with filters
-     * @route GET /api/categories
-     */
+    // Get all categories
     static async getAllCategories(req, res) {
         try {
-            const result = await CategoryService.getAllCategories(req.query);
-
-            return ResponseUtil.paginated(
-                res,
-                result.categories,
-                result.pagination,
-                'Categories retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'CategoryController',
-                method: 'getAllCategories',
-                query: req.query
+            const categories = await Category.findAll({
+                order: [['name', 'ASC']]
             });
 
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            res.status(200).json({
+                success: true,
+                message: 'Categories retrieved successfully',
+                data: categories
+            });
+        } catch (error) {
+            console.error('Get all categories error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve categories'
+            });
         }
     }
 
-    /**
-     * Get category by ID
-     * @route GET /api/categories/:id
-     */
+    // Get category by ID
     static async getCategoryById(req, res) {
         try {
             const { id } = req.params;
-            const category = await CategoryService.getCategoryById(id);
+            const category = await Category.findByPk(id);
 
-            return ResponseUtil.success(
-                res,
-                category,
-                'Category retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'CategoryController',
-                method: 'getCategoryById',
-                params: req.params
+            if (!category) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Category not found'
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Category retrieved successfully',
+                data: category
             });
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+        } catch (error) {
+            console.error('Get category by ID error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve category'
+            });
         }
     }
 
-    /**
-     * Create new category
-     * @route POST /api/categories
-     */
+    // Create new category
     static async createCategory(req, res) {
         try {
-            const category = await CategoryService.createCategory(req.body);
+            const { name, description } = req.body;
 
-            return ResponseUtil.created(
-                res,
-                category,
-                'Category created successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'CategoryController',
-                method: 'createCategory',
-                body: req.body
+            if (!name) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Category name is required'
+                });
+            }
+
+            const category = await Category.create({
+                name,
+                description: description || '',
+                is_active: true
             });
 
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof ConflictError) {
-                return ResponseUtil.conflict(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            res.status(201).json({
+                success: true,
+                message: 'Category created successfully',
+                data: category
+            });
+        } catch (error) {
+            console.error('Create category error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to create category'
+            });
         }
     }
 
-    /**
-     * Update category
-     * @route PUT /api/categories/:id
-     */
+    // Update category
     static async updateCategory(req, res) {
         try {
             const { id } = req.params;
-            const category = await CategoryService.updateCategory(id, req.body);
+            const updateData = req.body;
 
-            return ResponseUtil.updated(
-                res,
-                category,
-                'Category updated successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'CategoryController',
-                method: 'updateCategory',
-                params: req.params,
-                body: req.body
+            const [updatedRowsCount] = await Category.update(updateData, {
+                where: { id }
             });
 
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
+            if (updatedRowsCount === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Category not found'
+                });
             }
 
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
+            const updatedCategory = await Category.findByPk(id);
 
-            if (error instanceof ConflictError) {
-                return ResponseUtil.conflict(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+            res.status(200).json({
+                success: true,
+                message: 'Category updated successfully',
+                data: updatedCategory
+            });
+        } catch (error) {
+            console.error('Update category error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to update category'
+            });
         }
     }
 
-    /**
-     * Delete category (soft delete)
-     * @route DELETE /api/categories/:id
-     */
+    // Delete category
     static async deleteCategory(req, res) {
         try {
             const { id } = req.params;
-            const result = await CategoryService.deleteCategory(id);
-
-            return ResponseUtil.deleted(res, result.message);
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'CategoryController',
-                method: 'deleteCategory',
-                params: req.params
+            const deletedRowsCount = await Category.destroy({
+                where: { id }
             });
 
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
+            if (deletedRowsCount === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Category not found'
+                });
             }
 
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get category statistics
-     * @route GET /api/categories/:id/stats
-     */
-    static async getCategoryStats(req, res) {
-        try {
-            const { id } = req.params;
-            const statsData = await CategoryService.getCategoryStats(id);
-
-            return ResponseUtil.success(
-                res,
-                statsData,
-                'Category statistics retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'CategoryController',
-                method: 'getCategoryStats',
-                params: req.params
+            res.status(200).json({
+                success: true,
+                message: 'Category deleted successfully'
             });
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+        } catch (error) {
+            console.error('Delete category error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to delete category'
+            });
         }
     }
 }

@@ -1,581 +1,168 @@
-import UserService from '../services/user-services.js';
-import {
-    ResponseUtil,
-    ErrorUtil,
-    ValidationError,
-    NotFoundError,
-    ConflictError,
-    UnauthorizedError
-} from '../utils/index.js';
-import { MESSAGES } from '../constant/index.js';
-import jwt from 'jsonwebtoken';
+import UserService from '../services/user-service.js';
 
 class UserController {
-
-    /**
-     * Get all users with filters
-     * @route GET /api/users
-     */
-    static async getAllUsers(req, res) {
+    // Register a new user
+    static async register(req, res) {
         try {
-            const result = await UserService.getAllUsers(req.query);
+            const { username, email, password, role, first_name, last_name } = req.body;
+            if (!username || !email || !password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Username, email, and password are required'
+                });
+            }
 
-            return ResponseUtil.paginated(
-                res,
-                result.users,
-                result.pagination,
-                'Users retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'getAllUsers',
-                query: req.query
+            const userData = {
+                username,
+                email,
+                password,
+                role: role || 'user',
+                first_name: first_name || username,
+                last_name: last_name || 'User'
+            };
+
+            const result = await UserService.createUser(userData);
+
+            res.status(201).json({
+                success: true,
+                message: 'User registered successfully',
+                data: result
             });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+        } catch (error) {
+            console.error('Register error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to register user'
+            });
         }
     }
 
-    /**
-     * Get user by ID
-     * @route GET /api/users/:id
-     */
+    // Login user
+    static async login(req, res) {
+        try {
+            const { email, password } = req.body;
+
+            if (!email || !password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email and password are required'
+                });
+            }
+
+            const result = await UserService.loginUser({ email, password });
+
+            res.status(200).json({
+                success: true,
+                message: 'Login successful',
+                data: result
+            });
+        } catch (error) {
+            console.error('Login error:', error);
+            res.status(401).json({
+                success: false,
+                message: error.message || 'Login failed'
+            });
+        }
+    }
+
+    // Get all users
+    static async getAllUsers(req, res) {
+        try {
+            const users = await UserService.getAllUsers();
+
+            res.status(200).json({
+                success: true,
+                message: 'Users retrieved successfully',
+                data: users
+            });
+        } catch (error) {
+            console.error('Get all users error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve users'
+            });
+        }
+    }
+
+    // Get user by ID
     static async getUserById(req, res) {
         try {
             const { id } = req.params;
             const user = await UserService.getUserById(id);
 
-            return ResponseUtil.success(
-                res,
-                user,
-                'User retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'getUserById',
-                params: req.params
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'User retrieved successfully',
+                data: user
             });
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+        } catch (error) {
+            console.error('Get user by ID error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to retrieve user'
+            });
         }
     }
 
-    /**
-     * Get current user profile
-     * @route GET /api/users/me
-     */
-    static async getCurrentUser(req, res) {
-        try {
-            // Assuming user ID is set in req.user by authentication middleware
-            const userId = req.user?.id;
-
-            if (!userId) {
-                return ResponseUtil.unauthorized(res, 'Authentication required');
-            }
-
-            const user = await UserService.getUserById(userId);
-
-            return ResponseUtil.success(
-                res,
-                user,
-                'Current user profile retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'getCurrentUser',
-                user: req.user
-            });
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Create new user (Admin only)
-     * @route POST /api/users
-     */
-    static async createUser(req, res) {
-        try {
-            const user = await UserService.createUser(req.body);
-
-            return ResponseUtil.created(
-                res,
-                user,
-                'User created successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'createUser',
-                body: { ...req.body, password: '[REDACTED]' }
-            });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof ConflictError) {
-                return ResponseUtil.conflict(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Update user
-     * @route PUT /api/users/:id
-     */
+    // Update user
     static async updateUser(req, res) {
         try {
             const { id } = req.params;
-            const user = await UserService.updateUser(id, req.body);
+            const updateData = req.body;
 
-            return ResponseUtil.updated(
-                res,
-                user,
-                'User updated successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'updateUser',
-                params: req.params,
-                body: req.body
+            const user = await UserService.updateUser(id, updateData);
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'User updated successfully',
+                data: user
             });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (error instanceof ConflictError) {
-                return ResponseUtil.conflict(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
+        } catch (error) {
+            console.error('Update user error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to update user'
+            });
         }
     }
 
-    /**
-     * Update current user profile
-     * @route PUT /api/users/me
-     */
-    static async updateCurrentUser(req, res) {
-        try {
-            const userId = req.user?.id;
-
-            if (!userId) {
-                return ResponseUtil.unauthorized(res, 'Authentication required');
-            }
-
-            // Remove sensitive fields that users shouldn't be able to update themselves
-            const { role, status, email_verified, ...allowedUpdates } = req.body;
-
-            const user = await UserService.updateUser(userId, allowedUpdates);
-
-            return ResponseUtil.updated(
-                res,
-                user,
-                'Profile updated successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'updateCurrentUser',
-                user: req.user,
-                body: req.body
-            });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (error instanceof ConflictError) {
-                return ResponseUtil.conflict(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Delete user (Admin only)
-     * @route DELETE /api/users/:id
-     */
+    // Delete user
     static async deleteUser(req, res) {
         try {
             const { id } = req.params;
             const result = await UserService.deleteUser(id);
 
-            return ResponseUtil.deleted(res, result.message);
+            if (!result) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'User deleted successfully'
+            });
         } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'deleteUser',
-                params: req.params
+            console.error('Delete user error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to delete user'
             });
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * User login
-     * @route POST /api/auth/login
-     */
-    static async login(req, res) {
-        try {
-            const { login, password } = req.body;
-
-            if (!login || !password) {
-                return ResponseUtil.badRequest(res, 'Login credential and password are required');
-            }
-
-            const user = await UserService.authenticateUser(login, password);
-
-            // Generate JWT token
-            const token = jwt.sign(
-                {
-                    id: user.id,
-                    username: user.username,
-                    email: user.email,
-                    role: user.role
-                },
-                process.env.JWT_SECRET || 'fallback-secret',
-                {
-                    expiresIn: process.env.JWT_EXPIRES_IN || '24h'
-                }
-            );
-
-            return ResponseUtil.success(
-                res,
-                {
-                    user,
-                    token,
-                    expires_in: process.env.JWT_EXPIRES_IN || '24h'
-                },
-                'Login successful'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'login',
-                body: { login: req.body.login, password: '[REDACTED]' }
-            });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof UnauthorizedError) {
-                return ResponseUtil.unauthorized(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * User registration
-     * @route POST /api/auth/register
-     */
-    static async register(req, res) {
-        try {
-            const user = await UserService.createUser({
-                ...req.body,
-                role: 'user', // Force role to 'user' for registration
-                status: 'active'
-            });
-
-            // Generate email verification token
-            const verificationResult = await UserService.generateEmailVerificationToken(user.id);
-
-            return ResponseUtil.created(
-                res,
-                {
-                    user,
-                    verification_token: verificationResult.token,
-                    message: 'Registration successful. Please verify your email.'
-                },
-                'User registered successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'register',
-                body: { ...req.body, password: '[REDACTED]' }
-            });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof ConflictError) {
-                return ResponseUtil.conflict(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Change password
-     * @route POST /api/users/change-password
-     */
-    static async changePassword(req, res) {
-        try {
-            const userId = req.user?.id;
-
-            if (!userId) {
-                return ResponseUtil.unauthorized(res, 'Authentication required');
-            }
-
-            const { currentPassword, newPassword } = req.body;
-            const result = await UserService.changePassword(userId, currentPassword, newPassword);
-
-            return ResponseUtil.success(
-                res,
-                result,
-                'Password changed successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'changePassword',
-                user: req.user,
-                body: { currentPassword: '[REDACTED]', newPassword: '[REDACTED]' }
-            });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (error instanceof UnauthorizedError) {
-                return ResponseUtil.unauthorized(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Request password reset
-     * @route POST /api/auth/forgot-password
-     */
-    static async requestPasswordReset(req, res) {
-        try {
-            const { email } = req.body;
-            const result = await UserService.generatePasswordResetToken(email);
-
-            return ResponseUtil.success(
-                res,
-                {
-                    message: result.message,
-                    expires: result.expires
-                    // Note: Don't send the actual token in response for security
-                },
-                'Password reset email sent'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'requestPasswordReset',
-                body: req.body
-            });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof NotFoundError) {
-                return ResponseUtil.notFound(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Reset password with token
-     * @route POST /api/auth/reset-password
-     */
-    static async resetPassword(req, res) {
-        try {
-            const { token, newPassword } = req.body;
-            const result = await UserService.resetPassword(token, newPassword);
-
-            return ResponseUtil.success(
-                res,
-                result,
-                'Password reset successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'resetPassword',
-                body: { token: req.body.token, newPassword: '[REDACTED]' }
-            });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof UnauthorizedError) {
-                return ResponseUtil.unauthorized(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Verify email
-     * @route POST /api/auth/verify-email
-     */
-    static async verifyEmail(req, res) {
-        try {
-            const { token } = req.body;
-            const result = await UserService.verifyEmail(token);
-
-            return ResponseUtil.success(
-                res,
-                result,
-                'Email verified successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'verifyEmail',
-                body: req.body
-            });
-
-            if (error instanceof ValidationError) {
-                return ResponseUtil.badRequest(res, error.message, error.errors);
-            }
-
-            if (error instanceof UnauthorizedError) {
-                return ResponseUtil.unauthorized(res, error.message);
-            }
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Get user statistics (Admin only)
-     * @route GET /api/users/statistics
-     */
-    static async getUserStatistics(req, res) {
-        try {
-            const statistics = await UserService.getUserStatistics();
-
-            return ResponseUtil.success(
-                res,
-                statistics,
-                'User statistics retrieved successfully'
-            );
-        } catch (error) {
-            ErrorUtil.logError(error, {
-                controller: 'UserController',
-                method: 'getUserStatistics'
-            });
-
-            if (ErrorUtil.isOperationalError(error)) {
-                return ResponseUtil.error(res, error.message, error.statusCode);
-            }
-
-            return ResponseUtil.error(res, MESSAGES.ERROR.SERVER_ERROR);
         }
     }
 }
